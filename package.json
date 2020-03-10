@@ -21,8 +21,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "e2e:headless": "cross-env BROWSER=none jest -c jest.config.js",
-    "e2e": "cross-env BROWSER=none HEADLESS=false jest --runInBand -c jest.config.js",
+    "start:e2e": "cross-env PORT=7777 BROWSER=none react-scripts start",
+    "e2e:headless": "cross-env jest -c jest.config.js",
+    "e2e": "cross-env HEADLESS=false jest --runInBand -c jest.config.js",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
