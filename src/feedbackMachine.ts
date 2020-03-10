@@ -1,6 +1,6 @@
-import { Machine } from 'xstate';
+import { createMachine } from 'xstate';
 
-export const feedbackMachine = Machine({
+export const feedbackMachine = createMachine({
   id: 'feedback',
   initial: 'question',
   states: {

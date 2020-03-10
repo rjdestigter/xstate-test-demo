@@ -1,20 +1,18 @@
-// @ts-check
+import React, { useReducer, useEffect, Reducer } from "react";
+import styled from "styled-components";
 
-import React, { useReducer, useEffect } from 'react';
-import styled from 'styled-components';
-
-function useKeyDown(key, onKeyDown) {
+function useKeyDown(key: KeyboardEvent["key"], onKeyDown: () => void) {
   useEffect(() => {
-    const handler = e => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === key) {
         onKeyDown();
       }
     };
 
-    window.addEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
 
-    return () => window.removeEventListener('keydown', handler);
-  }, [onKeyDown]);
+    return () => window.removeEventListener("keydown", handler);
+  }, [key, onKeyDown]);
 }
 
 const StyledScreen = styled.div`
@@ -46,10 +44,10 @@ const StyledScreen = styled.div`
       margin-left: 0.5rem;
     }
 
-    &[data-variant='good'] {
+    &[data-variant="good"] {
       background-color: #7cbd67;
     }
-    &[data-variant='bad'] {
+    &[data-variant="bad"] {
       background-color: #ff4652;
     }
   }
@@ -61,7 +59,7 @@ const StyledScreen = styled.div`
     font-size: 1rem;
   }
 
-  [data-testid='close-button'] {
+  [data-testid="close-button"] {
     position: absolute;
     top: 0;
     right: 0;
@@ -77,15 +75,25 @@ const StyledScreen = styled.div`
     align-items: center;
 
     &:before {
-      content: '×';
+      content: "×";
       font-size: 1.5rem;
       color: rgba(0, 0, 0, 0.5);
     }
   }
 `;
 
-function QuestionScreen({ onClickGood, onClickBad, onClose }) {
-  useKeyDown('Escape', onClose);
+type QuestionScreenProps = {
+  onClickGood: () => void;
+  onClickBad: () => void;
+  onClose: () => void;
+};
+
+function QuestionScreen({
+  onClickGood,
+  onClickBad,
+  onClose
+}: QuestionScreenProps) {
+  useKeyDown("Escape", onClose);
 
   return (
     <StyledScreen data-testid="question-screen">
@@ -105,20 +113,27 @@ function QuestionScreen({ onClickGood, onClickBad, onClose }) {
   );
 }
 
-function FormScreen({ onSubmit, onClose }) {
-  useKeyDown('Escape', onClose);
+type FormScreenProps = {
+  onSubmit: (value: string) => void;
+  onClose: () => void;
+};
+
+type Foo = JSX.IntrinsicElements["form"]["onSubmit"];
+
+function FormScreen({ onSubmit, onClose }: FormScreenProps) {
+  useKeyDown("Escape", onClose);
 
   return (
     <StyledScreen
       as="form"
       data-testid="form-screen"
-      onSubmit={e => {
+      onSubmit={(
+        e: any
+      ) => {
         e.preventDefault();
         const { response } = e.target.elements;
 
-        onSubmit({
-          value: response
-        });
+        onSubmit(response);
       }}
     >
       <header>Care to tell us why?</header>
@@ -127,7 +142,7 @@ function FormScreen({ onSubmit, onClose }) {
         name="response"
         placeholder="Complain here"
         onKeyDown={e => {
-          if (e.key === 'Escape') {
+          if (e.key === "Escape") {
             e.stopPropagation();
           }
         }}
@@ -143,43 +158,56 @@ function FormScreen({ onSubmit, onClose }) {
   );
 }
 
-function ThanksScreen({ onClose }) {
-  useKeyDown('Escape', onClose);
+type ThanksScreenProps = {
+  onClose: () => void
+}
+
+function ThanksScreen({ onClose }: ThanksScreenProps) {
+  useKeyDown("Escape", onClose);
 
   return (
     <StyledScreen data-testid="thanks-screen">
       <header>Thanks for your feedback.</header>
       <button data-testid="close-button" title="close" onClick={onClose} />
     </StyledScreen>
-  );
+  )
 }
 
-function feedbackReducer(state, event) {
+type Event = {
+  type: "GOOD" | "BAD" | "CLOSE" 
+} | {
+  type: "SUBMIT",
+  value: string
+}
+
+type State = "question" | "form" | "thanks" | "closed"
+
+const feedbackReducer: Reducer<State, Event> = (state: State = "question", event: Event) => {
   switch (state) {
-    case 'question':
+    case "question":
       switch (event.type) {
-        case 'GOOD':
-          return 'thanks';
-        case 'BAD':
-          return 'form';
-        case 'CLOSE':
-          return 'closed';
+        case "GOOD":
+          return "thanks";
+        case "BAD":
+          return "form";
+        case "CLOSE":
+          return "closed";
         default:
           return state;
       }
-    case 'form':
+    case "form":
       switch (event.type) {
-        case 'SUBMIT':
-          return 'thanks';
-        case 'CLOSE':
-          return 'closed';
+        case "SUBMIT":
+          return "thanks";
+        case "CLOSE":
+          return "closed";
         default:
           return state;
       }
-    case 'thanks':
+    case "thanks":
       switch (event.type) {
-        case 'CLOSE':
-          return 'closed';
+        case "CLOSE":
+          return "closed";
         default:
           return state;
       }
@@ -189,27 +217,28 @@ function feedbackReducer(state, event) {
 }
 
 function Feedback() {
-  const [state, send] = useReducer(feedbackReducer, 'question');
+  const [state, send] = useReducer(feedbackReducer, "question");
 
   switch (state) {
-    case 'question':
+    case "question":
       return (
         <QuestionScreen
-          onClickGood={() => send({ type: 'GOOD' })}
-          onClickBad={() => send({ type: 'BAD' })}
-          onClose={() => send({ type: 'CLOSE' })}
+          onClickGood={() => send({ type: "GOOD" })}
+          onClickBad={() => send({ type: "BAD" })}
+          onClose={() => send({ type: "CLOSE" })}
         />
       );
-    case 'form':
+    case "form":
       return (
         <FormScreen
-          onSubmit={value => send({ type: 'SUBMIT', value })}
-          onClose={() => send({ type: 'CLOSE' })}
+          onSubmit={value => send({ type: "SUBMIT", value })}
+          onClose={() => send({ type: "CLOSE" })}
         />
       );
-    case 'thanks':
-      return <ThanksScreen onClose={() => send({ type: 'CLOSE' })} />;
-    case 'closed':
+    case "thanks":
+      return <ThanksScreen onClose={() => send({ type: "CLOSE" })} />;
+    case "closed":
+    default:
       return null;
   }
 }
