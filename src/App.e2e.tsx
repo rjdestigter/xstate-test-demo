@@ -3,12 +3,73 @@ import { createModel } from "@xstate/test";
 import { Page, Request } from "puppeteer";
 import { Deferred, defer } from "./delay";
 
+/**
+ * Events dispatched to and by the testing machine
+ */
 type Event =
   | {
       type: "CLICK_GOOD" | "CLICK_BAD" | "CLOSE" | "ESC" | "SUCCESS" | "FAILURE"
     }
   | { type: "SUBMIT"; value: string };
 
+/**
+ * # Make a request interceptor for puppeteer.
+ * 
+ * ## Failure pattern
+ * 
+ * `failurePattern` is an array where each index represents a test plan's index.
+ * Each element in the array is an array as well where each subindex
+ * represents a  plan's path's index.
+ * 
+ * That array contains a list of strings representing whether the intercepted
+ * request should fail or not.
+ * 
+ * Example:
+ * ```
+ * const failurePattern = [
+ *  [["BAD", "OK"]],
+ *  [["OK", "BAD", "OK"]],
+ * ]
+ * ```
+ * 
+ * `failurePattern` is built up in the `forEach` loops where we test each path.
+ * The pattern is taken from a plan's path's description based on the events dispatched
+ * for that path. This is done by applying a regular expression tothe path description.
+ * 
+ * So "via CLICK_BAD → SUBMIT ({"value":"something"}) → SUCCESS → CLOSE (323ms)" would
+ * give you ["SUCCESS"] for example.
+ * 
+ * Or, if the user was able to retry a failed request:
+ * 
+ * "via CLICK_BAD → SUBMIT ({"value":"something"}) → FAILURE → RETRY -> SUCCESS -> CLOSE (323ms)" would
+ * give you ["FAILURE", "SUCCESS"] for example.
+ * 
+ * The plan and path index are communicated to the request interceptor via query parameters in the frame's URL.
+ * E.g., the test visits "http://localhost:3000?plathIndex=2&planInde=0"
+ * 
+ * ## Buffer
+ * 
+ * A buffer of promises is used to give you control of order-of-execution.
+ * 
+ * For example:
+ * - in the SUBMIT event handler for this test
+ * - before simulating the button click
+ * - a promise is pushed to the buffer.
+ * - Then in the "submitting" state's test function,
+ * - once it has verified that the UI reflects a "is submitting" state
+ * - it resolves the promise that is in the buffer.
+ * 
+ * Order of execution:
+ * - Put promise in buffer
+ * - Simulate click
+ * - UI makes network request
+ * - Interceptor picks promise from buffer and pauses.
+ * - State is tested
+ * - Promise in buffer is resolved
+ * - Interceptor contiinues and pop's the resolved promise from the buffer.
+ * @param failurePattern Pattern of failure
+ * @param buffer Buffer of promises.
+ */
 export const makeOnRequest = (
   failurePattern: string[][][],
   buffer: Deferred[] = []
@@ -18,12 +79,15 @@ export const makeOnRequest = (
 
     if (deferred) {
       await deferred;
+      // Pop it once it's resolved. Don't pop it before that otherwise
+      // the test won't have access to it to resolve it.
       buffer.shift();
     }
   }
 
   const url = interceptedRequest.url();
 
+  // If the url matches an API our app would ue
   if (/foobar/.test(url)) {
     if (interceptedRequest.method() === "OPTIONS") {
       return interceptedRequest.respond({
@@ -81,9 +145,6 @@ describe("feedback app", () => {
             await page.waitFor('[data-testid="question-screen"]');
             await page.waitFor('[data-testid="bad-button"]');
             await page.waitFor('[data-testid="good-button"]');
-
-            // await page.hover('data-testid="bad-button"')
-            // await delay()
           }
         }
       },
@@ -92,6 +153,7 @@ describe("feedback app", () => {
           SUBMIT: [
             {
               target: "submitting",
+              // Only transition to submitting if the user has entered a value.
               cond: (_, e) => e.value.trim().length > 0
             },
             { target: "closed" }
@@ -111,8 +173,11 @@ describe("feedback app", () => {
         },
         meta: {
           test: async (page: Page) => {
+            // Wait for the loading message
             await page.waitFor('[data-testid="submitting"]');
 
+            // And resolve the promise in the buffer so that the
+            // request interceptor can continue 
             buffer.forEach(deferred => {
               deferred.resolve()
             })
@@ -174,6 +239,8 @@ describe("feedback app", () => {
         await page.type('[data-testid="response-input"]', event.value);
 
         if (event.value.length > 0) {
+          // Put a promise in the buffer to be resolved
+          // in the "submitting" state's test.
           buffer.push(defer('Submitting' ,'Submitting'))
         }
 
@@ -183,16 +250,20 @@ describe("feedback app", () => {
     }
   });
 
+  // Create the test plans
   const testPlans = testModel.getSimplePathPlans();
 
+  // Iterate the plans and paths and test each:
   testPlans.forEach((plan, planIndex) => {
     describe(`${planIndex}: ${plan.description}`, () => {
+      // Start with an empty list for the failur patterns for this plan.
       failurePattern[planIndex] = [];
 
       plan.paths.forEach((path, pathIndex) => {
         it(
           `${pathIndex}: ${path.description}`,
           async () => {
+            // Populate this path's failure pattern 
             failurePattern[planIndex][pathIndex] =
               path.description.match(
                 /SUCCESS|FAILURE/g
@@ -200,6 +271,8 @@ describe("feedback app", () => {
 
             const outcomes = failurePattern[planIndex][pathIndex];
 
+            // Outcomes is added to the frame url for info but pathIndex and planIndex are important
+            // as they are read in the request interceptor
             await page.goto(
               `http://localhost:7777?pathIndex=${pathIndex}&planIndex=${planIndex}&outcomes=${outcomes.join(
                 ","

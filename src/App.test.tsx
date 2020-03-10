@@ -1,7 +1,7 @@
 import React from "react";
 import Feedback from "./App";
 import { createMachine } from "xstate";
-import { render, fireEvent, cleanup } from "@testing-library/react";
+import { render, fireEvent, cleanup, waitForElement, act } from "@testing-library/react";
 import { assert } from "chai";
 import { createModel } from "@xstate/test";
 
@@ -47,6 +47,12 @@ type Event =
 type TestContext = ReturnType<typeof render>;
 
 describe("feedback app", () => {
+  beforeEach(() => { // if you have an existing `beforeEach` just add the following line to it
+    fetchMock.mockIf(/foobar/, async () => {
+      return { status: 200 }
+    })
+  })
+
   const feedbackMachine = createMachine<any, Event>({
     id: "feedback",
     initial: "question",
@@ -84,8 +90,9 @@ describe("feedback app", () => {
           CLOSE: "closed"
         },
         meta: {
-          test: ({ getByTestId }: TestContext) => {
-            assert.ok(getByTestId("thanks-screen"));
+          test: async ({ getByTestId }: TestContext) => {
+            const element = await waitForElement(() => getByTestId("thanks-screen"))
+            assert.ok(element);
           }
         }
       },
@@ -118,6 +125,7 @@ describe("feedback app", () => {
         fireEvent.change(getByTestId("response-input") as HTMLElement, {
           target: { value: event.value }
         });
+        
         fireEvent.click(getByTestId("submit-button") as HTMLElement);
       },
       cases: [{ value: "something" }, { value: "" }]
@@ -132,8 +140,10 @@ describe("feedback app", () => {
 
       plan.paths.forEach(path => {
         it(path.description, () => {
-          const rendered = render(<Feedback />);
-          return path.test(rendered);
+          return act(async () => {
+            const rendered = render(<Feedback />);
+            await path.test(rendered);
+          })
         });
       });
     });

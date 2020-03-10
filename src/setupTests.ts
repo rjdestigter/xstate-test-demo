@@ -3,3 +3,9 @@
 // expect(element).toHaveTextContent(/react/i)
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom/extend-expect';
+
+//setupJest.js or similar file
+import jestFetchMock from 'jest-fetch-mock'
+
+jestFetchMock.enableMocks();
+jestFetchMock.dontMock()

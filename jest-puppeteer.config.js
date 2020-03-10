@@ -6,6 +6,6 @@ module.exports = {
   // },
   launch: {
     headless: process.env.HEADLESS === "false" ? false : true,
-    slowMo: 0
+    slowMo: process.env.HEADLESS === "false" ? 50 : 0
   }
 };

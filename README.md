@@ -1,5 +1,19 @@
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Testing with puppeteer
+A few issues have been encountered while developing tests using puppeteer and intercepting it's requests.
+
+### CORS
+Add the `"Access-Control-Allow-Origin": "*"` header to the response when intercepting requests in headless mode and mocking the response with [request.respond](https://pptr.dev/#?product=Puppeteer&version=v2.1.1&show=api-requestrespondresponse)
+
+### "Access-Control-Allow-Headers
+Add `"Access-Control-Allow-Headers": "*"` to a mocked response if you are using custom headers. (For loggin, etc)
+
+### Server doesn't shut down when tests fail
+Currently the "server" configuration in `jest-puppeteer.config.js` is commented out. There seems to be an issue when the test fails the node server isn't shut down and has to be manually killed.
+
+Related issue: https://github.com/smooth-code/jest-puppeteer/issues/305
+
 ## Available Scripts
 
 In the project directory, you can run:
@@ -16,6 +30,14 @@ You will also see any lint errors in the console.
 
 Launches the test runner in the interactive watch mode.<br />
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+
+### `yarn e2e`
+
+Launches the end-to-end test runner in the browser. Make sure to start the server first with `yarn start:e2e`
+
+### `yarn e2e:headless`
+
+Launches the end-to-end test runner in a headless browser.  Make sure to start the server first with `yarn start:e2e`
 
 ### `yarn build`
 
