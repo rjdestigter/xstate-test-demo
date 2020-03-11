@@ -223,13 +223,13 @@ context("Feedback E2E Test", () => {
   const testPlans = testModel.getSimplePathPlans();
 
   // Iterate the plans and paths and test each:
-  testPlans.slice(0, 2).forEach((plan, planIndex) => {
-    describe(`${planIndex}: ${plan.description}`, () => {
+  testPlans.forEach((plan, planIndex) => {
+    describe(`Plan ${planIndex}: ${plan.description}`, () => {
       // Start with an empty list for the failur patterns for this plan.
       failurePattern[planIndex] = [];
 
       plan.paths.forEach((path, pathIndex) => {
-        it(`${pathIndex}: ${path.description}`, () => {
+        it(`Path ${pathIndex}: ${path.description}`, () => {
           // Populate this path's failure pattern
           failurePattern[planIndex][pathIndex] =
             path.description.match(/SUCCESS|FAILURE/g) || [];
@@ -248,13 +248,19 @@ context("Feedback E2E Test", () => {
             await path.test(cy);
             resolve();
           });
-        });
-        // 10000
+        });        
       });
     });
   });
 
-  it.skip("coverage", () => {
-    testModel.testCoverage();
+  describe('Test Coverage', () => {
+  it("All states tested.", () => {
+    return new Cypress.Promise(async resolve => {
+      await testModel.testCoverage();
+      resolve();
+    });
   });
+
+})
+ 
 });
