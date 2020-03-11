@@ -146,12 +146,12 @@ function FormScreen({ onSubmit, onClose, onSuccess, onFailure }: FormScreenProps
       ) => {
         e.preventDefault();
         const { response } = e.target.elements;
-        
+        debugger
         onSubmit(response);
-
+        debugger
         if (response.value.length > 0) {
           try {
-            await fetch(window.location.href + "?foobar")
+            await fetch(window.location.href + "&foobar=zoo")
 
             // throw Error("Network down")
             onSuccess()
