@@ -23,12 +23,50 @@ type FeedbackEvent =
     }
   | { type: "SUBMIT"; value: string };
 
-
+const feedbackMachine = createMachine({
+  id: "feedback",
+  initial: "question",
+  on: {
+    ESC: "closed"
+  },
+  states: {
+    question: {
+      on: {
+        CLICK_BAD: "form",
+        CLICK_GOOD: "thanks"
+      }
+    },
+    form: {
+      on: {
+        SUBMIT: "submitting",
+        CLOSE: "closed"
+      }
+    },
+    submitting: {
+      on: {
+        FAILED: "failure",
+        SUCCEEDED: "thanks",
+        CLOSE: "closed"
+      }
+    },
+    failure: {
+      on: {
+        CLOSE: "closed"
+      }
+    },
+    thanks: {
+      on: {
+        CLOSE: "closed"
+      }
+    },
+    closed: {}
+  }
+});
 
 context("Feedback E2E Test", () => {
   const buffer: Deferred[] = [];
   const failurePattern: string[][][] = [];
-  
+
   before(() => {
     cy.log("Cypress-Unfetch: Polyfill Fetch >>> XHR Fallback");
     // Load the standalone polyfill w/ a closure, prevents race
@@ -42,14 +80,14 @@ context("Feedback E2E Test", () => {
       method: "GET",
       url: /SUCCESS.*foobar/,
       response: [],
-      delay: 250,
+      delay: 250
     }).as("SUCCESS");
 
     cy.route({
       method: "GET",
       url: /FAILURE.*foobar/,
       status: 500,
-      delay: 250,
+      delay: 250
     }).as("FAILURE");
   });
 
@@ -69,17 +107,14 @@ context("Feedback E2E Test", () => {
           CLOSE: "closed"
         },
         meta: {
-          test: async (cp: typeof cy) => {
-            return new Cypress.Promise(async resolve => {
-              cp.get('[data-testid="question-screen"]').then(() =>
-                cp.get('[data-testid="bad-button"]').then(() =>
-                  cp.get('[data-testid="good-button"]').then(() => {
-                    resolve();
-                  })
-                )
-              );
-            });
-          }
+          test: async () =>
+            new Cypress.Promise(resolve => {
+              cy.get('[data-testid="question-screen"]');
+              cy.get('[data-testid="question-screen"]');
+              cy.get('[data-testid="good-button"]').then(() => {
+                resolve();
+              });
+            })
         }
       },
       form: {
@@ -108,16 +143,16 @@ context("Feedback E2E Test", () => {
           FAILURE: "failure"
         },
         meta: {
-          test: (cp: typeof cy) => {
+          test: () => {
             return new Cypress.Promise(async resolve => {
-              cp.get('[data-testid="submitting"]').then(() => {
+              cy.get('[data-testid="submitting"]').then(() => {
                 // And resolve the promise in the buffer so that the
                 // request interceptor can continue
                 buffer.forEach(deferred => {
                   deferred.resolve();
                 });
 
-                resolve()
+                resolve();
               });
             });
           }
@@ -128,9 +163,9 @@ context("Feedback E2E Test", () => {
           CLOSE: "closed"
         },
         meta: {
-          test: (cp: typeof cy) => {
+          test: () => {
             return new Cypress.Promise(async resolve => {
-              cp.get('[data-testid="failure-screen"]').then(resolve);
+              cy.get('[data-testid="failure-screen"]').then(resolve);
             });
           }
         }
@@ -140,9 +175,9 @@ context("Feedback E2E Test", () => {
           CLOSE: "closed"
         },
         meta: {
-          test: (cp: typeof cy) => {
+          test: () => {
             return new Cypress.Promise(async resolve => {
-              cp.get('[data-testid="thanks-screen"]').then(resolve);
+              cy.get('[data-testid="thanks-screen"]').then(resolve);
             });
           }
         }
@@ -150,9 +185,9 @@ context("Feedback E2E Test", () => {
       closed: {
         // type: "final",
         meta: {
-          test: (cp: typeof cy) => {
+          test: () => {
             return new Cypress.Promise(async resolve => {
-              cp.get('[data-testid="close-browser-msg"]').then(resolve);
+              cy.get('[data-testid="close-browser-msg"]').then(resolve);
             });
           }
         }
@@ -161,60 +196,55 @@ context("Feedback E2E Test", () => {
   });
 
   const testModel = createModel<typeof cy>(feedbackMachine).withEvents({
-    CLICK_GOOD: cp => {
-      return new Cypress.Promise(async resolve => {
-        cp.get('[data-testid="good-button"]')
+    CLICK_GOOD: () =>
+      new Cypress.Promise(resolve => {
+        cy.get('[data-testid="good-button"]')
           .click()
           .then(resolve);
-      });
-    },
-    CLICK_BAD: cp => {
-      return new Cypress.Promise(async resolve => {
-        cp.get('[data-testid="bad-button"]')
+      }),
+    CLICK_BAD: () =>
+      new Cypress.Promise(resolve => {
+        cy.get('[data-testid="bad-button"]')
           .click()
           .then(resolve);
-      });
-    },
-    CLOSE: cp => {
-      return new Cypress.Promise(async resolve => {
-        cp.get('[data-testid="close-button"]')
+      }),
+    CLOSE: () =>
+      new Cypress.Promise(resolve => {
+        cy.get('[data-testid="close-button"]')
           .click()
           .then(resolve);
-      });
-    },
-    ESC: cp => {
-      return new Cypress.Promise(async resolve => {
-        cp.get("body")
+      }),
+    ESC: () =>
+      new Cypress.Promise(resolve => {
+        cy.get("body")
           .type("{esc}")
           .then(resolve);
-      });
-    },
-    SUCCESS: cp => {
+      }),
+    SUCCESS: () => {
       return;
     },
-    FAILURE: cp => {
+    FAILURE: () => {
       return;
     },
     SUBMIT: {
-      exec: (cp: typeof cy, event: any) => {
-        return new Cypress.Promise(async resolve => {
-          const handle = cp.get('[data-testid="response-input"]')
+      exec: (_, event: any) =>
+        new Cypress.Promise(async resolve => {
+          const handle = cy.get('[data-testid="response-input"]');
           const nextHandle = event.value ? handle.type(event.value) : handle;
 
           nextHandle.then(() => {
             if (event.value.length > 0) {
-                // Put a promise in the buffer to be resolved
-                // in the "submitting" state's test.
-                cy.log(`Buffer Submitting`);
-                buffer.push(defer("Submitting", "Submitting"));
-              }
+              // Put a promise in the buffer to be resolved
+              // in the "submitting" state's test.
+              cy.log(`Buffer Submitting`);
+              buffer.push(defer("Submitting", "Submitting"));
+            }
 
-              cp.get('[data-testid="submit-button"]')
-                .click()
-                .then(resolve);
-            });
-        });
-      },
+            cy.get('[data-testid="submit-button"]')
+              .click()
+              .then(resolve);
+          });
+        }),
       cases: [{ value: "something" }, { value: "" }]
     }
   });
@@ -248,19 +278,17 @@ context("Feedback E2E Test", () => {
             await path.test(cy);
             resolve();
           });
-        });        
+        });
       });
     });
   });
 
-  describe('Test Coverage', () => {
-  it("All states tested.", () => {
-    return new Cypress.Promise(async resolve => {
-      await testModel.testCoverage();
-      resolve();
+  describe("Test Coverage", () => {
+    it("All states tested.", () => {
+      return new Cypress.Promise(async resolve => {
+        await testModel.testCoverage();
+        resolve();
+      });
     });
   });
-
-})
- 
 });
